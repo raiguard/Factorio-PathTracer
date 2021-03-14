@@ -2,7 +2,7 @@ for i = 1, 16 do
   data:extend{
     {
       type = "sprite",
-      name = "phl_route_belt_"..i,
+      name = "ptrc_route_belt_"..i,
       filename = "__PathHighlighter__/graphics/visualization/belts.png",
       x = 32 * (i - 1),
       size = 32
@@ -18,7 +18,7 @@ for y = 0, width.y - size.y, size.y do
     data:extend{
       {
         type = "sprite",
-        name = "phl_route_splitter_"..i,
+        name = "ptrc_route_splitter_"..i,
         width = size.x,
         height = size.y,
         x = x,
