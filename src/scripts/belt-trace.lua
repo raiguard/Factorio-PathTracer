@@ -1,9 +1,11 @@
 local direction_util = require("__flib__.direction")
-local table = require("__flib__.table")
 
 local constants = require("constants")
 
 local queue = require("lib.queue")
+
+local bor = bit32.bor
+local lshift = bit32.lshift
 
 local belt_trace = {}
 
@@ -11,7 +13,7 @@ local belt_trace = {}
 
 function belt_trace.start(player, player_table, entity)
   local data = queue.new()
-  data.objects = {[entity.unit_number] = {}}
+  data.objects = {[entity.unit_number] = {entity = entity}}
   queue.push_right(data, {entity = entity, direction = "inputs"})
   queue.push_right(data, {entity = entity, direction = "outputs"})
 
@@ -27,15 +29,33 @@ function belt_trace.cancel(player_table)
   player_table.active_trace = nil
 end
 
-local function draw_sprite(player_index, entity, sprite)
-  return rendering.draw_sprite{
-    sprite = 'ptrc_trace_belt_'..constants.marker_entry[sprite],
-    orientation = entity.direction / 8,
-    tint = {r = 1, g = 1},
-    target = entity,
-    surface = entity.surface,
-    players = {player_index}
-  }
+local function draw_sprite(obj, sprite, player_index)
+  local entity = obj.entity
+
+  local sprite_file = "ptrc_trace_belt_"..constants.marker_entry[sprite]
+
+  if obj.id then
+    rendering.set_sprite(obj.id, sprite_file)
+  else
+    obj.id = rendering.draw_sprite{
+      sprite = sprite_file,
+      orientation = entity.direction / 8,
+      tint = {r = 1, g = 1},
+      target = entity,
+      surface = entity.surface,
+      players = {player_index}
+    }
+  end
+
+  obj.sprite = sprite
+end
+
+local function interpret_directions(sprite, prop_direction, neighbour_direction, entity_direction)
+  local direction = 0
+  if prop_direction == "inputs" then
+    direction = direction_util.opposite((neighbour_direction - entity_direction) % 8)
+  end
+  return bor(sprite, lshift(1, direction))
 end
 
 function belt_trace.iterate()
@@ -54,64 +74,54 @@ function belt_trace.iterate()
         local entity = entity_data.entity
         if entity.valid then
           local prop_direction = entity_data.direction
+          local opposite_prop_direction = prop_direction == "inputs" and "outputs" or "inputs"
 
-          -- get standard belt neighbours
-          local neighbours = table.map(
-            entity.belt_neighbours[entity_data.direction],
-            function(neighbour)
-              return {entity = neighbour, direction = prop_direction}
-            end
-          )
+          local neighbours = entity.belt_neighbours[prop_direction]
 
           -- add special-case neighbours
           if entity.type == "linked-belt" then
-            neighbours[#neighbours + 1] = {entity = entity.linked_belt_neighbour, direction = prop_direction}
+            neighbours[#neighbours + 1] = entity.linked_belt_neighbour
           elseif entity.type == "underground-belt" then
-            neighbours[#neighbours + 1] = {entity = entity.neighbours, direction = prop_direction}
+            neighbours[#neighbours + 1] = entity.neighbours
           end
 
           -- iterate all neighbours
-          for _, neighbour_data in pairs(neighbours) do
-            local neighbour = neighbour_data.entity
+          for _, neighbour in pairs(neighbours) do
             local object = data.objects[neighbour.unit_number]
             if object then
-              -- TODO: update that object to include the new direction
+              if object.entity.type == "transport-belt" then
+                draw_sprite(
+                  object,
+                  interpret_directions(
+                    object.sprite or 0,
+                    opposite_prop_direction,
+                    entity.direction,
+                    neighbour.direction
+                  ),
+                  player_index
+                )
+              end
             else
               -- add neighbour to lookup table right away so it's only iterated once
-              data.objects[neighbour.unit_number] = {}
+              data.objects[neighbour.unit_number] = {entity = neighbour}
               -- iterate the neighbour's neighbours later in the cycle
               queue.push_right(data, {entity = neighbour, direction = prop_direction, source = entity})
             end
           end
 
-          -- add source entity for sprite purposes, if there is one
-          local source = entity_data.source
-          if source then
-            neighbours[#neighbours + 1] = {
-              entity = source,
-              direction = constants.opposite_prop_direction[prop_direction]
-            }
-          end
-
           -- draw sprite
           local obj = data.objects[entity.unit_number]
-          if not obj.id then
-            if entity.type == "transport-belt" then
-              local entity_direction = entity.direction
-              local bor = bit32.bor
-              local lshift = bit32.lshift
-              local sprite = 0
-              for _, neighbour_data in pairs(neighbours) do
-                local neighbour = neighbour_data.entity
-                local direction = 0
-                if neighbour_data.direction == "inputs" then
-                  direction = direction_util.opposite((neighbour.direction - entity_direction) % 8)
-                end
-                sprite = bor(sprite, lshift(1, direction))
-              end
-              obj.id = draw_sprite(player_index, entity, sprite)
-              obj.sprite = sprite
+          if entity.type == "transport-belt" then
+            local entity_direction = entity.direction
+            local sprite = 0
+            for _, neighbour in pairs(neighbours) do
+              sprite = interpret_directions(sprite, prop_direction, neighbour.direction, entity_direction)
             end
+            local source = entity_data.source
+            if source then
+              sprite = interpret_directions(sprite, opposite_prop_direction, source.direction, entity_direction)
+            end
+            draw_sprite(obj, sprite, player_index)
           end
         end
       end

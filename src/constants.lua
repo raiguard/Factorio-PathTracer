@@ -21,11 +21,6 @@ constants.marker_entry = {
   [85] = 15,
 }
 
-constants.opposite_prop_direction = {
-  inputs = "outputs",
-  outputs = "inputs",
-}
-
 constants.selection_types = table.invert{
   "transport-belt",
   "underground-belt",
