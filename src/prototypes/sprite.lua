@@ -3,7 +3,7 @@ for i = 1, 16 do
     {
       type = "sprite",
       name = "ptrc_route_belt_"..i,
-      filename = "__PathHighlighter__/graphics/visualization/belts.png",
+      filename = "__PathTracer__/graphics/visualization/belts.png",
       x = 32 * (i - 1),
       size = 32
     }
@@ -23,7 +23,7 @@ for y = 0, width.y - size.y, size.y do
         height = size.y,
         x = x,
         y = y,
-        filename = "__PathHighlighter__/graphics/visualization/splitters.png"
+        filename = "__PathTracer__/graphics/visualization/splitters.png"
       }
     }
     i = i + 1

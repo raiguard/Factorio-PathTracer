@@ -35,7 +35,7 @@ event.on_selected_entity_changed(function(e)
 
   local selected = player.selected
   if selected and selected.valid then
-    -- TODO: start highlight
+    -- TODO: start trace
   end
 end)
 

@@ -10,7 +10,7 @@
       "adjustMods": {
         "EditorExtensions": true,
         "flib": true,
-        "PathHighlighter": true,
+        "PathTracer": true,
         "Sandbox": true
       },
       "disableExtraMods": true

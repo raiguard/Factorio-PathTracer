@@ -7,7 +7,7 @@
       "name": "Debug",
       "factorioPath": "${env:factorioTestbench1}",
       "hookMode": "debug",
-      "hookControl": ["PathHighlighter", "Sandbox"],
+      "hookControl": ["PathTracer", "Sandbox"],
       "factorioArgs": ["--load-scenario", "EditorExtensions/testing"]
     },
     {
@@ -16,7 +16,7 @@
       "name": "Debug (data)",
       "factorioPath": "${env:factorioTestbench1}",
       "hookMode": "debug",
-      "hookControl": ["PathHighlighter", "Sandbox"],
+      "hookControl": ["PathTracer", "Sandbox"],
       "hookData": true,
       "hookSettings": true,
       "factorioArgs": ["--load-scenario", "EditorExtensions/testing"]
@@ -27,7 +27,7 @@
       "name": "Profile",
       "factorioPath": "${env:factorioTestbench1}",
       "hookMode": "profile",
-      "hookControl": ["PathHighlighter", "Sandbox"]
+      "hookControl": ["PathTracer", "Sandbox"]
     }
   ]
 }
