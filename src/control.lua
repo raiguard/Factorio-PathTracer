@@ -19,14 +19,23 @@ event.on_init(function()
   end
 end)
 
-event.on_load(function()
-end)
-
 event.on_configuration_changed(function(e)
   if migration.on_config_changed(e, migrations) then
     for i, player_table in pairs(global.players) do
       player_data.refresh(game.get_player(i), player_table)
     end
+  end
+end)
+
+-- ENTITY
+
+event.on_selected_entity_changed(function(e)
+  local player = game.get_player(e.player_index)
+  local player_table = global.players[e.player_index]
+
+  local selected = player.selected
+  if selected and selected.valid then
+    -- TODO: start highlight
   end
 end)
 
