@@ -1,10 +1,10 @@
-for i = 1, 16 do
+for i = 0, 15 do
   data:extend{
     {
       type = "sprite",
-      name = "ptrc_route_belt_"..i,
+      name = "ptrc_trace_belt_"..i,
       filename = "__PathTracer__/graphics/visualization/belts.png",
-      x = 32 * (i - 1),
+      x = 32 * i,
       size = 32
     }
   }
@@ -18,7 +18,7 @@ for y = 0, width.y - size.y, size.y do
     data:extend{
       {
         type = "sprite",
-        name = "ptrc_route_splitter_"..i,
+        name = "ptrc_trace_splitter_"..i,
         width = size.x,
         height = size.y,
         x = x,
