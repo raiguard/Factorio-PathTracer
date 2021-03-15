@@ -48,10 +48,10 @@ local function draw_sprite(obj, sprite_type, sprite, player_index)
   obj.sprite = sprite
 end
 
-local function append_belt_sprite(sprite, prop_direction, neighbour_direction, entity_direction)
+local function append_belt_sprite(sprite, prop_direction, neighbour, entity)
   local direction = 0
   if prop_direction == "input" then
-    direction = direction_util.opposite((neighbour_direction - entity_direction) % 8)
+    direction = direction_util.opposite((neighbour.direction - entity.direction) % 8)
   end
   return bor(sprite, lshift(1, direction))
 end
@@ -59,7 +59,7 @@ end
 local function append_splitter_sprite(sprite, prop_direction, neighbour, entity)
   local dir_add = prop_direction == "input" and 4 or 0 -- Additional shift added if it's an input
   local side_add -- Additional shift added if the neighbour is on the right side
-  -- Entity directions
+  -- Entity direction
   local entity_direction = entity.direction
   local directions = defines.direction
   -- Entity positions
@@ -74,17 +74,16 @@ local function append_splitter_sprite(sprite, prop_direction, neighbour, entity)
     -- Add connections on both sides in the corresponding direction
     sprite = bor(sprite, lshift(1, dir_add))
     sprite = bor(sprite, lshift(1, dir_add + 2))
-    return sprite
   else
     -- Add an individual connection to the corresponding corner
     if entity_direction == directions.north then
       side_add = (neighbour_position.x > entity_position.x) and 2 or 0
     elseif entity_direction == directions.east then
-      side_add = (neighbour_position.y < entity_position.y) and 2 or 0
+      side_add = (neighbour_position.y > entity_position.y) and 2 or 0
     elseif entity_direction == directions.south then
       side_add = (neighbour_position.x < entity_position.x) and 2 or 0
     elseif entity_direction == directions.west then
-      side_add = (neighbour_position.y > entity_position.y) and 2 or 0
+      side_add = (neighbour_position.y < entity_position.y) and 2 or 0
     end
     sprite = bor(sprite, lshift(1, side_add + dir_add))
   end
@@ -123,36 +122,41 @@ function belt_trace.iterate()
           for _, neighbour in pairs(neighbours) do
             local object = data.objects[neighbour.unit_number]
             if object then
-              if object.entity.type == "transport-belt" then
-                draw_sprite(
-                  object,
-                  "belt",
-                  append_belt_sprite(
-                    object.sprite or 0,
-                    opposite_prop_direction,
-                    entity.direction,
-                    neighbour.direction
-                  ),
-                  player_index
-                )
-              elseif object.entity.type == "splitter" then
-                draw_sprite(
-                  object,
-                  "splitter",
-                  append_splitter_sprite(
-                    object.sprite or 0,
-                    opposite_prop_direction,
-                    entity,
-                    neighbour
-                  ),
-                  player_index
-                )
+              if object.sprite then
+                local obj_entity = object.entity
+                local entity_type = obj_entity.type
+                if entity_type == "transport-belt" or entity_type == "splitter" then
+                  local append_func = entity_type == "transport-belt" and append_belt_sprite or append_splitter_sprite
+                  draw_sprite(
+                    object,
+                    entity_type == "transport-belt" and "belt" or "splitter",
+                    append_func(
+                      object.sprite or 0,
+                      opposite_prop_direction,
+                      obj_entity,
+                      neighbour
+                    ),
+                    player_index
+                  )
+                  -- TODO: Temporary
+                  rendering.draw_circle{
+                    color = {r = 0.5, a = 0.5},
+                    filled = true,
+                    radius = 0.15,
+                    target = entity,
+                    players = {player_index},
+                    surface = entity.surface,
+                    time_to_live = 2
+                  }
+                end
+              elseif object.sources then
+                object.sources[#object.sources + 1] = entity
               end
             else
               -- Add neighbour to lookup table right away so it's only iterated once
-              data.objects[neighbour.unit_number] = {entity = neighbour}
+              data.objects[neighbour.unit_number] = {entity = neighbour, sources = {entity}}
               -- Iterate the neighbour's neighbours later in the cycle
-              queue.push_right(data, {entity = neighbour, direction = prop_direction, source = entity})
+              queue.push_right(data, {entity = neighbour, direction = prop_direction})
             end
           end
 
@@ -162,39 +166,36 @@ function belt_trace.iterate()
             -- TODO: deduplicate?
             local sprite = 0
             local sprite_type
-            if entity.type == "transport-belt" then
-              sprite_type = "belt"
-              local entity_direction = entity.direction
+            local entity_type = entity.type
+            if entity_type == "transport-belt" or entity_type == "splitter" then
+              sprite_type = entity_type == "splitter" and "splitter" or "belt"
+              -- use a different append sprite function for belts and splitters
+              local append_func = entity_type == "splitter" and append_splitter_sprite or append_belt_sprite
               -- Regular neighbours
               for _, neighbour in pairs(neighbours) do
-                sprite = append_belt_sprite(sprite, prop_direction, neighbour.direction, entity_direction)
+                sprite = append_func(sprite, prop_direction, neighbour, entity)
               end
               -- The "source neighbour" is the one entity from the opposite propagation direction that needs to be
               -- drawn as connected
               -- If the "source neighbour" does not exist, then this is the origin, so draw all connections
-              local source = entity_data.source
-              if source then
-                sprite = append_belt_sprite(sprite, opposite_prop_direction, source.direction, entity_direction)
-              else
-                for _, neighbour in pairs(entity.belt_neighbours[opposite_prop_direction.."s"]) do
-                  sprite = append_belt_sprite(sprite, opposite_prop_direction, neighbour.direction, entity_direction)
+              local sources = obj.sources
+              if sources then
+                for _, source in pairs(sources) do
+                  sprite = append_func(sprite, opposite_prop_direction, source, entity)
+                  -- TODO: Temporary
+                  rendering.draw_circle{
+                    color = {r = 0.5, a = 0.5},
+                    filled = true,
+                    radius = 0.15,
+                    target = source,
+                    players = {player_index},
+                    surface = source.surface,
+                    time_to_live = 2
+                  }
                 end
-              end
-            elseif entity.type == "splitter" then
-              sprite_type = "splitter"
-              -- Regular neighbours
-              for _, neighbour in pairs(neighbours) do
-                sprite = append_splitter_sprite(sprite, prop_direction, neighbour, entity)
-              end
-              -- The "source neighbour" is the one entity from the opposite propagation direction that needs to be
-              -- drawn as connected
-              -- If the "source neighbour" does not exist, then this is the origin, so draw all connections
-              local source = entity_data.source
-              if source then
-                sprite = append_splitter_sprite(sprite, opposite_prop_direction, source, entity)
               else
                 for _, neighbour in pairs(entity.belt_neighbours[opposite_prop_direction.."s"]) do
-                  sprite = append_splitter_sprite(sprite, opposite_prop_direction, neighbour, entity)
+                  sprite = append_func(sprite, opposite_prop_direction, neighbour, entity)
                 end
               end
             end
