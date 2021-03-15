@@ -12,7 +12,7 @@ end
 
 local size = {x = 64, y = 32}
 local width = {x = 256, y = 128}
-local i = 1
+local i = 0
 for y = 0, width.y - size.y, size.y do
   for x = 0, width.x - size.x, size.x do
     data:extend{
