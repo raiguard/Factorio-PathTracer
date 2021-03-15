@@ -9,13 +9,11 @@ local lshift = bit32.lshift
 
 local belt_trace = {}
 
--- TODO: rename propagation direction to something else
-
 function belt_trace.start(player, player_table, entity)
   local data = queue.new()
   data.objects = {[entity.unit_number] = {entity = entity}}
-  queue.push_right(data, {entity = entity, direction = "inputs"})
-  queue.push_right(data, {entity = entity, direction = "outputs"})
+  queue.push_right(data, {entity = entity, direction = "input"})
+  queue.push_right(data, {entity = entity, direction = "output"})
 
   player_table.active_trace = data
 end
@@ -50,9 +48,9 @@ local function draw_sprite(obj, sprite, player_index)
   obj.sprite = sprite
 end
 
-local function interpret_directions(sprite, prop_direction, neighbour_direction, entity_direction)
+local function append_belt_sprite(sprite, prop_direction, neighbour_direction, entity_direction)
   local direction = 0
-  if prop_direction == "inputs" then
+  if prop_direction == "input" then
     direction = direction_util.opposite((neighbour_direction - entity_direction) % 8)
   end
   return bor(sprite, lshift(1, direction))
@@ -61,12 +59,12 @@ end
 function belt_trace.iterate()
   for _, player in pairs(game.connected_players) do
     local player_index = player.index
-    -- TODO: perhaps add a lookup table to top-level `global`?
+    -- TODO: Perhaps add a lookup table to top-level `global`?
     local player_table = global.players[player_index]
     local data = player_table.active_trace
     if data then
-      -- iterate the queue
-      -- TODO: make the amount configurable
+      -- Iterate the queue
+      -- TODO: Make the amount configurable
       for _ = 1, 10 do
         if queue.length(data) == 0 then break end
 
@@ -74,25 +72,25 @@ function belt_trace.iterate()
         local entity = entity_data.entity
         if entity.valid then
           local prop_direction = entity_data.direction
-          local opposite_prop_direction = prop_direction == "inputs" and "outputs" or "inputs"
+          local opposite_prop_direction = prop_direction == "input" and "output" or "input"
 
-          local neighbours = entity.belt_neighbours[prop_direction]
+          local neighbours = entity.belt_neighbours[prop_direction.."s"]
 
-          -- add special-case neighbours
-          if entity.type == "linked-belt" then
+          -- Add special-case neighbours
+          if entity.type == "linked-belt" and entity.linked_belt_type ~= prop_direction then
             neighbours[#neighbours + 1] = entity.linked_belt_neighbour
-          elseif entity.type == "underground-belt" then
+          elseif entity.type == "underground-belt" and entity.belt_to_ground_type ~= prop_direction then
             neighbours[#neighbours + 1] = entity.neighbours
           end
 
-          -- iterate all neighbours
+          -- Iterate all neighbours
           for _, neighbour in pairs(neighbours) do
             local object = data.objects[neighbour.unit_number]
             if object then
               if object.entity.type == "transport-belt" then
                 draw_sprite(
                   object,
-                  interpret_directions(
+                  append_belt_sprite(
                     object.sprite or 0,
                     opposite_prop_direction,
                     entity.direction,
@@ -102,26 +100,37 @@ function belt_trace.iterate()
                 )
               end
             else
-              -- add neighbour to lookup table right away so it's only iterated once
+              -- Add neighbour to lookup table right away so it's only iterated once
               data.objects[neighbour.unit_number] = {entity = neighbour}
-              -- iterate the neighbour's neighbours later in the cycle
+              -- Iterate the neighbour's neighbours later in the cycle
               queue.push_right(data, {entity = neighbour, direction = prop_direction, source = entity})
             end
           end
 
-          -- draw sprite
+          -- Draw sprite
           local obj = data.objects[entity.unit_number]
-          if entity.type == "transport-belt" then
-            local entity_direction = entity.direction
-            local sprite = 0
-            for _, neighbour in pairs(neighbours) do
-              sprite = interpret_directions(sprite, prop_direction, neighbour.direction, entity_direction)
+          if not obj.id then -- The source entity will be iterated twice, so only draw it once
+            if entity.type == "transport-belt" then
+              local entity_direction = entity.direction
+              local sprite = 0
+              -- Regular neighbours
+              for _, neighbour in pairs(neighbours) do
+                sprite = append_belt_sprite(sprite, prop_direction, neighbour.direction, entity_direction)
+              end
+              -- The "source neighbour" is the one entity from the opposite propagation direction that needs to be
+              -- drawn as connected
+              -- If the "source neighbour" does not exist, then this is the origin, so draw all connections
+              local source = entity_data.source
+              if source then
+                sprite = append_belt_sprite(sprite, opposite_prop_direction, source.direction, entity_direction)
+              else
+                for _, neighbour in pairs(entity.belt_neighbours[opposite_prop_direction.."s"]) do
+                  sprite = append_belt_sprite(sprite, opposite_prop_direction, neighbour.direction, entity_direction)
+                end
+              end
+
+              draw_sprite(obj, sprite, player_index)
             end
-            local source = entity_data.source
-            if source then
-              sprite = interpret_directions(sprite, opposite_prop_direction, source.direction, entity_direction)
-            end
-            draw_sprite(obj, sprite, player_index)
           end
         end
       end
