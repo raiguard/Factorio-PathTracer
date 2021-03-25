@@ -100,7 +100,7 @@ function belt_trace.iterate()
     if data then
       -- Iterate the queue
       -- TODO: Make the amount configurable
-      for _ = 1, 10 do
+      for _ = 1, 1 do
         if queue.length(data) == 0 then break end
 
         local iteration = queue.pop_left(data)
