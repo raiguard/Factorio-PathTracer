@@ -223,8 +223,10 @@ function belt_trace.iterate()
         if queue.length(data) == 0 then break end
 
         local iteration = queue.pop_left(data)
+
         local entity_data = entities[iteration.entity_number]
         entity_data.key = nil -- This key will no longer be valid
+
         local entity = entity_data.entity
         if entity.valid then
           local side = iteration.side
@@ -251,14 +253,22 @@ function belt_trace.iterate()
                 if connection_iteration.side ~= side then
                   -- Backtrace all splitters to update their connections on the opposite sides
                   for splitter_unit_number in pairs(splitters) do
-                    queue.push_right(
-                      data,
-                      {entity_number = splitter_unit_number, side = opposite_side, splitters = {}}
-                    )
+                    local splitter_data = entities[splitter_unit_number]
+                    if not splitter_data.backtraced then
+                      splitter_data.backtraced = true
+                      queue.push_right(
+                        data,
+                        {entity_number = splitter_unit_number, side = opposite_side, splitters = {}}
+                      )
+                    end
                   end
                   -- Backtrace all splitters on the other branch as well
                   for splitter_unit_number in pairs(connection_iteration.splitters) do
-                    queue.push_right(data, {entity_number = splitter_unit_number, side = side, splitters = {}})
+                    local splitter_data = entities[splitter_unit_number]
+                    if not splitter_data.backtraced then
+                      splitter_data.backtraced = true
+                      queue.push_right(data, {entity_number = splitter_unit_number, side = side, splitters = {}})
+                    end
                   end
                   -- If the connection itself is a splitter, remove its iteration side so all connections are traced
                   if connection.type == "splitter" then
